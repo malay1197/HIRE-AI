@@ -55,16 +55,27 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // If candidate, initialize Candidate record
+    // If candidate, initialize or update Candidate record
     if (role === 'CANDIDATE') {
-      await db.candidate.create({
-        data: {
-          name,
-          email,
-          userId: user.id,
-          yearsOfExperience: 0,
-        },
+      const existingCandidate = await db.candidate.findUnique({
+        where: { email },
       });
+
+      if (existingCandidate) {
+        await db.candidate.update({
+          where: { id: existingCandidate.id },
+          data: { userId: user.id },
+        });
+      } else {
+        await db.candidate.create({
+          data: {
+            name,
+            email,
+            userId: user.id,
+            yearsOfExperience: 0,
+          },
+        });
+      }
     }
 
     const sessionPayload = {
