@@ -1,0 +1,196 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id             String         @id @default(uuid())
+  email          String         @unique
+  passwordHash   String
+  name           String
+  role           String         // "ADMIN" | "RECRUITER" | "CANDIDATE"
+  organizationId String?
+  organization   Organization?  @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+  candidate      Candidate?
+  notifications  Notification[]
+  auditLogs      AuditLog[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+model Organization {
+  id            String        @id @default(uuid())
+  name          String
+  users         User[]
+  jobs          Job[]
+  subscription  Subscription?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model Job {
+  id                 String          @id @default(uuid())
+  title              String
+  department         String
+  location           String
+  employmentType     String          // "FULL_TIME" | "PART_TIME" | "CONTRACT" | "INTERN"
+  salaryRange        String
+  experienceRequired String
+  skills             String          // Comma-separated or JSON
+  education          String
+  description        String
+  responsibilities   String
+  requirements       String
+  benefits           String
+  deadline           DateTime
+  status             String          // "DRAFT" | "PUBLISHED" | "PAUSED" | "CLOSED"
+  organizationId     String
+  organization       Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  applications       Application[]
+  interviewSlots     InterviewSlot[]
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+}
+
+model Candidate {
+  id                String        @id @default(uuid())
+  name              String
+  email             String        @unique
+  phone             String?
+  location          String?
+  yearsOfExperience Float?
+  skills            String?       // Comma-separated list of skills
+  education         String?       // JSON string for qualifications
+  experience        String?       // JSON string for work history
+  projects          String?       // JSON string for projects
+  certifications    String?       // JSON string for certs
+  resumeUrl         String?
+  userId            String?       @unique
+  user              User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  applications      Application[]
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+}
+
+model Application {
+  id                String         @id @default(uuid())
+  jobId             String
+  job               Job            @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  candidateId       String
+  candidate         Candidate      @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  status            String         // "APPLIED" | "UNDER_REVIEW" | "AI_SCREENING" | "SHORTLISTED" | "INTERVIEW" | "SELECTED" | "HIRED" | "REJECTED"
+  matchScore        Int            @default(0)
+  matchExplanation  String?
+  matchedSkills     String?        // Comma-separated or JSON
+  missingSkills     String?        // Comma-separated or JSON
+  relevantExperience String?
+  potentialConcerns String?
+  recommendation    String         // "STRONG_MATCH" | "MATCH" | "PARTIAL_MATCH" | "LOW_MATCH"
+  screenings        Screening[]
+  interviews        Interview[]
+  interviewSlots    InterviewSlot[]
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+}
+
+model Screening {
+  id                 String              @id @default(uuid())
+  applicationId      String
+  application        Application         @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  status             String              // "PENDING" | "COMPLETED"
+  technicalScore     Int                 @default(0)
+  communicationScore Int                 @default(0)
+  experienceScore    Int                 @default(0)
+  overallScore       Int                 @default(0)
+  summary            String?
+  questions          ScreeningQuestion[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+}
+
+model ScreeningQuestion {
+  id             String            @id @default(uuid())
+  screeningId    String
+  screening      Screening         @relation(fields: [screeningId], references: [id], onDelete: Cascade)
+  questionText   String
+  expectedPoints String?
+  answers        ScreeningAnswer[]
+  createdAt      DateTime          @default(now())
+}
+
+model ScreeningAnswer {
+  id                    String            @id @default(uuid())
+  questionId            String
+  question              ScreeningQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  answerText            String
+  technicalAnalysis     String?
+  communicationAnalysis String?
+  experienceAnalysis    String?
+  score                 Int               @default(0)
+  explanation           String?
+  createdAt             DateTime          @default(now())
+}
+
+model Interview {
+  id             String      @id @default(uuid())
+  applicationId  String
+  application    Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  interviewerName String
+  type           String      // "VIDEO" | "PHONE" | "IN_PERSON"
+  date           DateTime
+  timeSlot       String
+  status         String      // "SCHEDULED" | "COMPLETED" | "CANCELLED"
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+}
+
+model InterviewSlot {
+  id            String       @id @default(uuid())
+  jobId         String
+  job           Job          @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  date          DateTime
+  time          String       // e.g. "10:00 AM - 11:00 AM"
+  isBooked      Boolean      @default(false)
+  applicationId String?
+  application   Application? @relation(fields: [applicationId], references: [id], onDelete: SetNull)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String
+  type      String   // "INFO" | "SUCCESS" | "WARNING" | "ALERT"
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Subscription {
+  id                 String       @id @default(uuid())
+  organizationId     String       @unique
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  plan               String       // "FREE" | "STARTER" | "GROWTH" | "BUSINESS"
+  status             String       // "ACTIVE" | "PAST_DUE" | "CANCELLED"
+  activeJobsLimit    Int
+  resumeLimit        Int
+  aiScreeningLimit   Int
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  details   String
+  ipAddress String?
+  createdAt DateTime @default(now())
+}
